@@ -22,11 +22,12 @@ import re
 from DDSDisplayConverter import DdsDisplayConverter
 from dds_display import  DisplayST_M_MINE_PLAN_INFO, DisplayST_MINE_POINT
 from dds.AIEP_AIEP_ import CMSHCI_AIEP_M_MINE_SELECTED_PLAN, AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST, CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST, ST_M_MINE_PLAN_INFO, ST_M_MINE_PLAN_LIST, ST_WEAPON_WAYPOINT, CMSHCI_AIEP_WPN_GEO_WAYPOINTS, NAVINF_SHIP_NAVIGATION_INFO, TEWA_WA_TUBE_LOAD_INFO, TRKMGR_SYSTEMTARGET_INFO, AIEP_WPN_CTRL_STATUS_INFO
-from TEWA_ASSIGN_CMD_Window import TEWAAssignCmdWindow
-from WpnCtrlCmdWindow import WpnCtrlCmdWindow
-from PAInfoWindow import PAInfoWindow
-from WpnGeoWaypointsWindow import WpnGeoWaypointsWindow
-from AIWaypointsInferenceRequestWindow import AIWaypointsInferenceRequestWindow
+from Windows.TEWA_ASSIGN_CMD_Window import TEWAAssignCmdWindow
+from Windows.WpnCtrlCmdWindow import WpnCtrlCmdWindow
+from Windows.PAInfoWindow import PAInfoWindow
+from Windows.WpnGeoWaypointsWindow import WpnGeoWaypointsWindow
+from Windows.AIWaypointsInferenceRequestWindow import AIWaypointsInferenceRequestWindow
+from Windows.Show_M_MINE_DroppingPlan import DroppingPlanListWindow
 
 
 # --- Main GUI Class ---
@@ -110,5 +111,18 @@ class M_MINE_PlanGUI:
             # 또는 주기적으로 체크하는 타이머를 설정할 수도 있습니다.
             self.root.after(500, self.open_plan_list_window)
         else:
-            # 데이터가 수신되었으면 Plan List 창을 생성합니다. 
-            self.create_plan_list_window() # TODO. 이 함수를 다른 버튼들의 동작처럼 외부 파일에서 구현 후 사용하도록 구현 수정 필요
+            # 데이터가 수신되었으면 Plan List 창을 생성합니다.
+            DroppingPlanListWindow(
+                self.root,
+                self.req_publisher,
+                MySubscriber.data_AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST
+            )
+
+    
+def main():
+    root = tk.Tk()
+    app = M_MINE_PlanGUI(root)    
+    root.mainloop()
+
+if __name__ == "__main__":
+    main()
