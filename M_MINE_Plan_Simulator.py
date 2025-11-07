@@ -20,15 +20,31 @@ import array
 import ast
 import re
 from DDSDisplayConverter import DdsDisplayConverter
-from dds_display import  DisplayST_M_MINE_PLAN_INFO, DisplayST_MINE_POINT
-from dds.AIEP_AIEP_ import CMSHCI_AIEP_M_MINE_SELECTED_PLAN, AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST, CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST, ST_M_MINE_PLAN_INFO, ST_M_MINE_PLAN_LIST, ST_WEAPON_WAYPOINT, CMSHCI_AIEP_WPN_GEO_WAYPOINTS, NAVINF_SHIP_NAVIGATION_INFO, TEWA_WA_TUBE_LOAD_INFO, TRKMGR_SYSTEMTARGET_INFO, AIEP_WPN_CTRL_STATUS_INFO
+from dds.AIEP_AIEP_ import (
+    CMSHCI_AIEP_M_MINE_SELECTED_PLAN, 
+    AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST, 
+    CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST, 
+    ST_M_MINE_PLAN_INFO, ST_M_MINE_PLAN_LIST, 
+    ST_WEAPON_WAYPOINT, 
+    CMSHCI_AIEP_WPN_GEO_WAYPOINTS, 
+    NAVINF_SHIP_NAVIGATION_INFO, 
+    TEWA_WA_TUBE_LOAD_INFO, 
+    TRKMGR_SYSTEMTARGET_INFO, 
+    AIEP_WPN_CTRL_STATUS_INFO,
+    AIEP_ALM_ASM_EP_RESULT,
+    AIEP_WGT_EP_RESULT,
+    AIEP_AAM_EP_RESULT,
+    CMSHCI_AIEP_PA_INFO
+)
 from Windows.TEWA_ASSIGN_CMD_Window import TEWAAssignCmdWindow
 from Windows.WpnCtrlCmdWindow import WpnCtrlCmdWindow
 from Windows.PAInfoWindow import PAInfoWindow
 from Windows.WpnGeoWaypointsWindow import WpnGeoWaypointsWindow
 from Windows.AIWaypointsInferenceRequestWindow import AIWaypointsInferenceRequestWindow
 from Windows.Show_M_MINE_DroppingPlan import DroppingPlanListWindow
-
+from Windows.EngagementPlanViewer import EngagementPlanViewer
+from Windows.OwnshipInfoWindow import OwnshipInfoWindow
+from Windows.TubeLoadInfoWindow import TubeLoadInfoWindow
 
 # --- Main GUI Class ---
 class M_MINE_PlanGUI:
@@ -43,6 +59,11 @@ class M_MINE_PlanGUI:
         # 애플리케이션 시작 시 subscriber 스레드 시작
         threading.Thread(target=self.run_subscriber_thread, args=(83,), daemon=True).start()
 
+        # 시뮬레이터에서 설정한 정보 저장
+        self.pa_info_data = None           # 금지구역 정보
+        self.ownship_info_data = None      # 자함 정보
+        self.tube_load_info_data = {}      # 발사관 적재 정보 {tube_num: weapon_kind}
+
         # Main button: "Plan List" (to request all plan lists from other program)
         self.plan_list_request_btn = tk.Button(root, text="Plan List", command=self.request_plan_list)
         self.plan_list_request_btn.pack(pady=10)
@@ -53,14 +74,6 @@ class M_MINE_PlanGUI:
             command=TEWAAssignCmdWindow(self.root, self.req_publisher)
             )
 
-        # 무장 통제 명령 버튼 추가
-        self.wpn_ctrl_cmd_btn = tk.Button(
-            root,
-            text="Weapon Control",
-            command=WpnCtrlCmdWindow(self.root, self.req_publisher)
-        )
-        self.wpn_ctrl_cmd_btn.pack(pady=5)
-      
         # 교전계획 플롯 버튼 추가
         self.plot_ep_btn = tk.Button(
             root, 
@@ -68,7 +81,15 @@ class M_MINE_PlanGUI:
             command=self.show_engagement_plan
         )
         self.plot_ep_btn.pack(pady=5)
-      
+
+        # 무장 통제 명령 버튼 추가
+        self.wpn_ctrl_cmd_btn = tk.Button(
+            root,
+            text="Weapon Control",
+            command=WpnCtrlCmdWindow(self.root, self.req_publisher)
+        )
+        self.wpn_ctrl_cmd_btn.pack(pady=5)
+
         # Prohibited area info button
         self.pa_info_btn = tk.Button(
             root,
@@ -76,7 +97,7 @@ class M_MINE_PlanGUI:
             command=PAInfoWindow(self.root, self.req_publisher, self)
         )
         self.pa_info_btn.pack(pady=5)
-
+       
         # 경로점 수정 버튼 추가
         self.wpn_waypoints_btn = tk.Button(
             root,
@@ -93,8 +114,31 @@ class M_MINE_PlanGUI:
         )
         self.ai_waypoints_req_btn.pack(pady=5)
 
+                # Ownship Info (새로 추가)
+        self.ownship_info_btn = tk.Button(
+            root,
+            text="Ownship Info",
+            command=lambda: OwnshipInfoWindow(self.root, self.req_publisher, self),
+            bg="lightyellow"
+        )
+        self.ownship_info_btn.pack(pady=5)
+
+        # Tube Load Info (새로 추가)
+        self.tube_load_info_btn = tk.Button(
+            root,
+            text="Tube Load Info",
+            command=lambda: TubeLoadInfoWindow(self.root, self.req_publisher, self),
+            bg="lightyellow"
+        )
+        self.tube_load_info_btn.pack(pady=5)        
+
     def run_subscriber_thread(self, domainID):
         MySubscriber.run_subscriber(domain_id=domainID, sample_count=sys.maxsize)
+
+
+    def show_engagement_plan(self):
+        """Show engagement plan viewer with PA info"""
+        EngagementPlanViewer(self.root, self.pa_info_data)
 
     # --- DDS Request/Response ---
     def request_plan_list(self):
