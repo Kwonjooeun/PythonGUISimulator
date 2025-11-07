@@ -261,6 +261,7 @@ class DroppingPlanListWindow(tk.Toplevel):
             if not is_plan_info_empty(plan_list.stPlan[i]):
                 count += 1
         return count
+        
     def _add_new_list(self):
       """Add new plan list"""
       selection = self.tree.selection()
