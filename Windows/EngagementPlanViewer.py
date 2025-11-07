@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 """
 EngagementPlanViewer.py
-교전계획 전시 시스템
+교전계획 전시 시스템 (수정됨)
+- 자함 위치 전시 기능 개선
+- 금지 구역 원통 형태로 전시 (심도 100m ~ 수면)
 """
 
 import tkinter as tk
@@ -147,9 +149,6 @@ class EngagementPlanViewer(tk.Toplevel):
         bottom_frame = tk.Frame(main_frame)
         bottom_frame.pack(pady=10)
         
-        # Add spacers for alignment
-        tk.Label(bottom_frame, text="", width=12).pack(side=tk.LEFT)
-        
         bottom_tubes = [2, 1]
         for tube_num in bottom_tubes:
             btn_frame = tk.Frame(bottom_frame)
@@ -176,30 +175,19 @@ class EngagementPlanViewer(tk.Toplevel):
             
             self.tube_buttons[tube_num] = btn
             self.tube_status_labels[tube_num] = status_label
-        
-        # Close button
-        tk.Button(
-            self,
-            text="Close",
-            command=self.destroy,
-            width=15
-        ).pack(pady=20)
     
     def _start_status_update(self):
-        """Start periodic status update"""
+        """Start periodic tube status update"""
         self._update_tube_status()
     
     def _update_tube_status(self):
-        """Update tube status labels"""
-        if not self.winfo_exists():
-            return
-        
-        for tube_num in [1, 2, 3, 4, 5, 6]:
+        """Update tube button status"""
+        for tube_num in self.tube_buttons.keys():
             wpn_type, ep_data = get_tube_ep_data(tube_num)
             
             if wpn_type:
                 self.tube_status_labels[tube_num].config(
-                    text=f"{wpn_type} Active",
+                    text=f"{wpn_type}",
                     fg="green"
                 )
                 self.tube_buttons[tube_num].config(bg="lightgreen")
@@ -208,7 +196,7 @@ class EngagementPlanViewer(tk.Toplevel):
                     text="No Data",
                     fg="gray"
                 )
-                self.tube_buttons[tube_num].config(bg="lightgray")
+                self.tube_buttons[tube_num].config(bg="lightblue")
         
         # Schedule next update
         self.after(1000, self._update_tube_status)
@@ -363,16 +351,23 @@ class EPPlotWindow(tk.Toplevel):
         all_lats = []
         all_depths = []
         
+        # Plot weapon-specific data
         if wpn_type == 'M_MINE':
-            all_lons, all_lats, all_depths = self._plot_m_mine(ep_data)
+            wpn_lons, wpn_lats, wpn_depths = self._plot_m_mine(ep_data)
         elif wpn_type == 'ALM_ASM':
-            all_lons, all_lats, all_depths = self._plot_alm_asm(ep_data)
+            wpn_lons, wpn_lats, wpn_depths = self._plot_alm_asm(ep_data)
         elif wpn_type == 'WGT':
-            all_lons, all_lats, all_depths = self._plot_wgt(ep_data)
+            wpn_lons, wpn_lats, wpn_depths = self._plot_wgt(ep_data)
         elif wpn_type == 'AAM':
-            all_lons, all_lats, all_depths = self._plot_aam(ep_data)
+            wpn_lons, wpn_lats, wpn_depths = self._plot_aam(ep_data)
+        else:
+            wpn_lons, wpn_lats, wpn_depths = [], [], []
         
-        # Plot ownship position
+        all_lons.extend(wpn_lons)
+        all_lats.extend(wpn_lats)
+        all_depths.extend(wpn_depths)
+        
+        # Plot ownship position (MUST be plotted after weapon data to appear in legend)
         ownship_lon, ownship_lat, ownship_depth = self._plot_ownship()
         if ownship_lon is not None:
             all_lons.append(ownship_lon)
@@ -380,52 +375,163 @@ class EPPlotWindow(tk.Toplevel):
             all_depths.append(ownship_depth)
         
         # Plot prohibited areas (real-time from main GUI)
-        self._plot_prohibited_areas(all_lons, all_lats)
+        pa_lons, pa_lats = self._plot_prohibited_areas()
+        all_lons.extend(pa_lons)
+        all_lats.extend(pa_lats)
         
-        # Set labels
+        # Set labels and title
         self.ax.set_xlabel('Longitude (deg)', fontsize=10)
         self.ax.set_ylabel('Latitude (deg)', fontsize=10)
         self.ax.set_zlabel('Depth/Altitude (m)', fontsize=10)
+        self.ax.set_title(f'{wpn_type} Engagement Plan - Tube {self.tube_num}', fontsize=12, fontweight='bold')
         self.ax.view_init(elev=self.view_elev, azim=self.view_azim)
         
         # Set axis limits based on data range
         self._set_axis_limits(all_lons, all_lats, all_depths)
+        
+        # Add legend (after all plots are added)
+        self.ax.legend(loc='upper right', fontsize=8)
 
     def _plot_ownship(self):
-        """Plot ownship position (simulator data has priority)"""
+        """Plot ownship position (FIXED - now properly visible)"""
         # 1. Try simulator ownship info first (from main GUI)
+        ownship_info = None
+        source = None
+        
         if hasattr(self.main_gui, 'ownship_info_data') and self.main_gui.ownship_info_data:
             ownship_info = self.main_gui.ownship_info_data
             source = "Simulator"
         else:
             # 2. Fall back to external subscription
             ownship_info = get_ownship_info()
-            source = "External"
+            source = "DDS"
         
         if not ownship_info:
+            print("[DEBUG] No ownship info available")
             return None, None, None
         
         try:
             lat = ownship_info.stShipMovementInfo.dShipLatitude
             lon = ownship_info.stShipMovementInfo.dShipLongitude
-            depth = -ownship_info.stShipMovementInfo.fShipDepth
+            depth = -ownship_info.stShipMovementInfo.fShipDepth  # Negative for underwater
             
-            if lat != 0 or lon != 0:
-                # Different color for simulator vs external
-                color = 'cyan' if source == "Simulator" else 'lightblue'
-                
-                self.ax.scatter(
-                    [lon], [lat], [depth],
-                    c=color, s=300, marker='s', 
-                    edgecolors='black', linewidths=2,
-                    label=f'Ownship ({source})', zorder=10
-                )
-                return lon, lat, depth
+            # Validate coordinates
+            if lat == 0 and lon == 0:
+                print("[DEBUG] Ownship coordinates are zero")
+                return None, None, None
+            
+            # Different color/marker for simulator vs external
+            if source == "Simulator":
+                color = 'cyan'
+                marker = '^'  # Triangle up
+                size = 400
+                edge_color = 'darkblue'
+            else:
+                color = 'lightblue'
+                marker = 's'  # Square
+                size = 300
+                edge_color = 'black'
+            
+            # Plot ownship with high zorder to ensure visibility
+            self.ax.scatter(
+                [lon], [lat], [depth],
+                c=color, s=size, marker=marker,
+                edgecolors=edge_color, linewidths=3,
+                label=f'Ownship ({source})', zorder=100
+            )
+            
+            print(f"[DEBUG] Ownship plotted at Lon:{lon:.6f}, Lat:{lat:.6f}, Depth:{depth:.2f}m ({source})")
+            return lon, lat, depth
+            
         except Exception as e:
-            print(f"Error plotting ownship: {e}")
-        
-        return None, None, None
+            print(f"[ERROR] Error plotting ownship: {e}")
+            return None, None, None
   
+    def _plot_prohibited_areas(self):
+        """Plot prohibited areas as 3D cylinders (FIXED - from 100m depth to surface)"""
+        all_pa_lons = []
+        all_pa_lats = []
+        
+        # Get PA info from main GUI in real-time
+        pa_info = None
+        if hasattr(self.main_gui, 'pa_info_data'):
+            pa_info = self.main_gui.pa_info_data
+        
+        if not pa_info or pa_info.nCountPA == 0:
+            print("[DEBUG] No prohibited area data")
+            return all_pa_lons, all_pa_lats
+        
+        print(f"[DEBUG] Plotting {pa_info.nCountPA} prohibited areas")
+        
+        for i in range(pa_info.nCountPA):
+            pa = pa_info.stPaPoint[i]
+            
+            # Cylinder parameters
+            center_lon = pa.dLongitude
+            center_lat = pa.dLatitude
+            radius_m = pa.dRadius
+            
+            # Convert radius from meters to degrees (approximate)
+            # 1 degree latitude ≈ 111,000 meters
+            # For longitude, we need to adjust by cos(latitude)
+            radius_deg_lat = radius_m / 111000.0
+            radius_deg_lon = radius_m / (111000.0 * np.cos(np.radians(center_lat)))
+            
+            # Create cylinder: circle at multiple depth levels
+            num_circle_points = 50
+            theta = np.linspace(0, 2*np.pi, num_circle_points)
+            
+            # Depth levels for cylinder (from -100m to 0m, underwater so negative)
+            depth_levels = np.linspace(-100, 0, 20)  # 20 levels from 100m depth to surface
+            
+            # Draw vertical lines (edges of cylinder)
+            for angle in np.linspace(0, 2*np.pi, 12):  # 12 vertical lines
+                edge_lon = center_lon + radius_deg_lon * np.cos(angle)
+                edge_lat = center_lat + radius_deg_lat * np.sin(angle)
+                self.ax.plot(
+                    [edge_lon, edge_lon], 
+                    [edge_lat, edge_lat], 
+                    [-100, 0],
+                    'r-', linewidth=1, alpha=0.6
+                )
+            
+            # Draw horizontal circles at each depth level
+            for j, depth in enumerate(depth_levels):
+                circle_lons = center_lon + radius_deg_lon * np.cos(theta)
+                circle_lats = center_lat + radius_deg_lat * np.sin(theta)
+                circle_depths = np.full(num_circle_points, depth)
+                
+                # Different style for top (surface) and bottom circles
+                if j == 0:  # Bottom circle (100m depth)
+                    self.ax.plot(circle_lons, circle_lats, circle_depths,
+                                'r-', linewidth=2, alpha=0.9,
+                                label='Prohibited Area' if i == 0 else '')
+                elif j == len(depth_levels) - 1:  # Top circle (surface)
+                    self.ax.plot(circle_lons, circle_lats, circle_depths,
+                                'r-', linewidth=2, alpha=0.9)
+                else:  # Middle circles
+                    self.ax.plot(circle_lons, circle_lats, circle_depths,
+                                'r--', linewidth=0.5, alpha=0.4)
+                
+                # Add to all points for range calculation
+                all_pa_lons.extend(circle_lons.tolist())
+                all_pa_lats.extend(circle_lats.tolist())
+            
+            # Optional: Fill the cylinder with semi-transparent surface
+            # Create mesh for cylinder surface
+            z_mesh = np.linspace(-100, 0, 10)
+            theta_mesh = np.linspace(0, 2*np.pi, num_circle_points)
+            Theta_mesh, Z_mesh = np.meshgrid(theta_mesh, z_mesh)
+            
+            X_mesh = center_lon + radius_deg_lon * np.cos(Theta_mesh)
+            Y_mesh = center_lat + radius_deg_lat * np.sin(Theta_mesh)
+            
+            self.ax.plot_surface(X_mesh, Y_mesh, Z_mesh,
+                                alpha=0.15, color='red', 
+                                linewidth=0, antialiased=True)
+        
+        return all_pa_lons, all_pa_lats
+    
     def _plot_m_mine(self, ep_data):
         """Plot M_MINE engagement plan"""
         all_lons = []
@@ -442,7 +548,7 @@ class EPPlotWindow(tk.Toplevel):
             if traj.dLatitude != 0 or traj.dLongitude != 0:
                 traj_lats.append(traj.dLatitude)
                 traj_lons.append(traj.dLongitude)
-                traj_depths.append(-traj.fDepth)
+                traj_depths.append(-traj.fDepth)  # Negative for underwater
         
         if traj_lats:
             self.ax.plot(traj_lons, traj_lats, traj_depths, 
@@ -465,54 +571,59 @@ class EPPlotWindow(tk.Toplevel):
         
         if wp_lats:
             self.ax.scatter(wp_lons, wp_lats, wp_depths,
-                           c='green', s=100, marker='o', label='Waypoints')
+                           c='green', s=150, marker='o', 
+                           edgecolors='darkgreen', linewidths=2,
+                           label='Waypoints', zorder=50)
             all_lons.extend(wp_lons)
             all_lats.extend(wp_lats)
             all_depths.extend(wp_depths)
         
-        # Launch position
-        if ep_data.stLaunchPos.dLatitude != 0:
+        # Launch point
+        if ep_data.stLaunchPos.dLatitude != 0 or ep_data.stLaunchPos.dLongitude != 0:
             self.ax.scatter(
                 [ep_data.stLaunchPos.dLongitude],
                 [ep_data.stLaunchPos.dLatitude],
                 [-ep_data.stLaunchPos.fDepth],
-                c='blue', s=200, marker='^', label='Launch Point'
+                c='blue', s=200, marker='*',
+                edgecolors='darkblue', linewidths=2,
+                label='Launch Point', zorder=50
             )
             all_lons.append(ep_data.stLaunchPos.dLongitude)
             all_lats.append(ep_data.stLaunchPos.dLatitude)
             all_depths.append(-ep_data.stLaunchPos.fDepth)
         
-        # Drop position (target)
-        if ep_data.stDropPos.dLatitude != 0:
+        # Drop point (target)
+        if ep_data.stDropPos.dLatitude != 0 or ep_data.stDropPos.dLongitude != 0:
             self.ax.scatter(
                 [ep_data.stDropPos.dLongitude],
                 [ep_data.stDropPos.dLatitude],
                 [-ep_data.stDropPos.fDepth],
-                c='red', s=200, marker='*', label='Drop Point'
+                c='red', s=200, marker='X',
+                edgecolors='darkred', linewidths=2,
+                label='Drop Point', zorder=50
             )
             all_lons.append(ep_data.stDropPos.dLongitude)
             all_lats.append(ep_data.stDropPos.dLatitude)
             all_depths.append(-ep_data.stDropPos.fDepth)
         
-        # Current missile position
+        # Current mine position (if valid)
         if ep_data.bValidMslPos:
             self.ax.scatter(
                 [ep_data.MslPos.dLongitude],
                 [ep_data.MslPos.dLatitude],
                 [-ep_data.MslPos.fDepth],
-                c='orange', s=150, marker='D', label='Current Position'
+                c='orange', s=250, marker='D',
+                edgecolors='darkorange', linewidths=2,
+                label='Current Position', zorder=60
             )
             all_lons.append(ep_data.MslPos.dLongitude)
             all_lats.append(ep_data.MslPos.dLatitude)
             all_depths.append(-ep_data.MslPos.fDepth)
         
-        self.ax.legend()
-        self.ax.set_title(f'Mine Engagement Plan - Tube {self.tube_num}')
-        
         return all_lons, all_lats, all_depths
     
     def _plot_alm_asm(self, ep_data):
-        """Plot ALM/ASM engagement plan"""
+        """Plot ALM/ASM (Missile) engagement plan"""
         all_lons = []
         all_lats = []
         all_depths = []
@@ -527,7 +638,7 @@ class EPPlotWindow(tk.Toplevel):
             if traj.dLatitude != 0 or traj.dLongitude != 0:
                 traj_lats.append(traj.dLatitude)
                 traj_lons.append(traj.dLongitude)
-                traj_alts.append(traj.fDepth)
+                traj_alts.append(traj.fDepth)  # Altitude for missiles
         
         if traj_lats:
             self.ax.plot(traj_lons, traj_lats, traj_alts,
@@ -541,7 +652,8 @@ class EPPlotWindow(tk.Toplevel):
             wp = ep_data.stWaypoints[i]
             if wp.dLatitude != 0 or wp.dLongitude != 0:
                 self.ax.scatter([wp.dLongitude], [wp.dLatitude], [wp.fDepth],
-                               c='green', s=100, marker='o')
+                               c='green', s=100, marker='o',
+                               label='Waypoints' if i == 0 else '')
                 all_lons.append(wp.dLongitude)
                 all_lats.append(wp.dLatitude)
                 all_depths.append(wp.fDepth)
@@ -551,7 +663,8 @@ class EPPlotWindow(tk.Toplevel):
             tp = ep_data.stTurningpoints[i]
             if tp.dLatitude != 0 or tp.dLongitude != 0:
                 self.ax.scatter([tp.dLongitude], [tp.dLatitude], [tp.fDepth],
-                               c='purple', s=80, marker='s')
+                               c='purple', s=80, marker='s',
+                               label='Turning Points' if i == 0 else '')
                 all_lons.append(tp.dLongitude)
                 all_lats.append(tp.dLatitude)
                 all_depths.append(tp.fDepth)
@@ -568,9 +681,6 @@ class EPPlotWindow(tk.Toplevel):
             all_lats.append(ep_data.MslPos.dLatitude)
             all_depths.append(ep_data.MslPos.fDepth)
         
-        self.ax.legend()
-        self.ax.set_title(f'Missile Engagement Plan - Tube {self.tube_num}')
-        
         return all_lons, all_lats, all_depths
     
     def _plot_wgt(self, ep_data):
@@ -580,62 +690,54 @@ class EPPlotWindow(tk.Toplevel):
         all_depths = []
         
         # Torpedo trajectory
-        for i in range(ep_data.CntTrajectoryWGT):
-            traj = ep_data.stTrajectories_WGT[i]
-            if traj.dLatitude != 0 or traj.dLongitude != 0:
-                all_lons.append(traj.dLongitude)
-                all_lats.append(traj.dLatitude)
-                all_depths.append(-traj.fDepth)
+        traj_lats = []
+        traj_lons = []
+        traj_depths = []
         
-        if all_lons:
-            self.ax.plot(all_lons, all_lats, all_depths,
-                        'b-', linewidth=2, label='Torpedo Trajectory')
+        for i in range(128):  # Assuming max 128 trajectory points
+            if i >= len(ep_data.Traj_Lat) or i >= len(ep_data.Traj_Lon):
+                break
+            lat = ep_data.Traj_Lat[i]
+            lon = ep_data.Traj_Lon[i]
+            depth = ep_data.Traj_Depth[i]
+            
+            if lat != 0 or lon != 0:
+                traj_lats.append(lat)
+                traj_lons.append(lon)
+                traj_depths.append(-depth)  # Negative for underwater
         
-        # Target trajectory
-        tgt_lons = []
-        tgt_lats = []
-        tgt_depths = []
+        if traj_lats:
+            self.ax.plot(traj_lons, traj_lats, traj_depths,
+                        'b-', linewidth=2, label='Trajectory')
+            all_lons.extend(traj_lons)
+            all_lats.extend(traj_lats)
+            all_depths.extend(traj_depths)
         
-        for i in range(ep_data.CntTrajectoryTGT):
-            traj = ep_data.stTrajectories_TGT[i]
-            if traj.dLatitude != 0 or traj.dLongitude != 0:
-                tgt_lats.append(traj.dLatitude)
-                tgt_lons.append(traj.dLongitude)
-                tgt_depths.append(-traj.fDepth)
-        
-        if tgt_lats:
-            self.ax.plot(tgt_lons, tgt_lats, tgt_depths,
-                        'r--', linewidth=2, label='Target Trajectory')
-            all_lons.extend(tgt_lons)
-            all_lats.extend(tgt_lats)
-            all_depths.extend(tgt_depths)
-        
-        # Hit point
+        # Hit point (target)
         if ep_data.bHitPointFound:
             self.ax.scatter(
-                [ep_data.dHit_Longitude],
-                [ep_data.dHit_Latitude],
-                [0],
-                c='red', s=200, marker='*', label='Hit Point'
+                [ep_data.dHit_Lon],
+                [ep_data.dHit_Lat],
+                [-ep_data.dHit_Depth],
+                c='red', s=200, marker='X',
+                label='Target Hit Point', zorder=50
             )
-            all_lons.append(ep_data.dHit_Longitude)
-            all_lats.append(ep_data.dHit_Latitude)
-            all_depths.append(0)
+            all_lons.append(ep_data.dHit_Lon)
+            all_lats.append(ep_data.dHit_Lat)
+            all_depths.append(-ep_data.dHit_Depth)
         
         # Current torpedo position
         if ep_data.bValidTorpedoCurrentPosition:
             self.ax.scatter(
-                [ep_data.stTorpedoCurrentPosition.dLongitude],
-                [ep_data.stTorpedoCurrentPosition.dLatitude],
-                [-ep_data.stTorpedoCurrentPosition.fDepth],
-                c='orange', s=150, marker='D', label='Current Position'
+                [ep_data.dTorpedoCurrent_Lon],
+                [ep_data.dTorpedoCurrent_Lat],
+                [-ep_data.dTorpedoCurrent_Depth],
+                c='orange', s=150, marker='D',
+                label='Current Position', zorder=60
             )
-            all_lons.append(ep_data.stTorpedoCurrentPosition.dLongitude)
-            all_lats.append(ep_data.stTorpedoCurrentPosition.dLatitude)
-            all_depths.append(-ep_data.stTorpedoCurrentPosition.fDepth)
-        
-        self.ax.legend()
-        self.ax.set_title(f'Torpedo Engagement Plan - Tube {self.tube_num}')
+            all_lons.append(ep_data.dTorpedoCurrent_Lon)
+            all_lats.append(ep_data.dTorpedoCurrent_Lat)
+            all_depths.append(-ep_data.dTorpedoCurrent_Depth)
         
         return all_lons, all_lats, all_depths
     
@@ -645,57 +747,87 @@ class EPPlotWindow(tk.Toplevel):
         all_lats = []
         all_depths = []
         
-        # Early scenario
+        # Early scenario trajectory
+        early_lons = []
+        early_lats = []
+        early_alts = []
         for i in range(128):
             traj = ep_data.Early_Traj[i]
             if traj.dLatitude != 0 or traj.dLongitude != 0:
-                all_lons.append(traj.dLongitude)
-                all_lats.append(traj.dLatitude)
-                all_depths.append(traj.fAltitude)
+                early_lons.append(traj.dLongitude)
+                early_lats.append(traj.dLatitude)
+                early_alts.append(traj.fAltitude)
         
-        if all_lons:
-            self.ax.plot(all_lons, all_lats, all_depths,
-                        'b-', linewidth=2, alpha=0.6, label='Early Scenario')
+        if early_lons:
+            self.ax.plot(early_lons, early_lats, early_alts,
+                        'b-', linewidth=2, alpha=0.7, label='Early Scenario')
+            all_lons.extend(early_lons)
+            all_lats.extend(early_lats)
+            all_depths.extend(early_alts)
         
-        # Short, Late, Target scenarios (similar patterns)
-        # ... (생략)
+        # Short scenario trajectory
+        short_lons = []
+        short_lats = []
+        short_alts = []
+        for i in range(128):
+            traj = ep_data.Short_Traj[i]
+            if traj.dLatitude != 0 or traj.dLongitude != 0:
+                short_lons.append(traj.dLongitude)
+                short_lats.append(traj.dLatitude)
+                short_alts.append(traj.fAltitude)
         
-        self.ax.legend()
-        self.ax.set_title(f'AAM Engagement Plan - Tube {self.tube_num}')
+        if short_lons:
+            self.ax.plot(short_lons, short_lats, short_alts,
+                        'g-', linewidth=2, alpha=0.7, label='Short Scenario')
+            all_lons.extend(short_lons)
+            all_lats.extend(short_lats)
+            all_depths.extend(short_alts)
+        
+        # Late scenario trajectory
+        late_lons = []
+        late_lats = []
+        late_alts = []
+        for i in range(128):
+            traj = ep_data.Late_Traj[i]
+            if traj.dLatitude != 0 or traj.dLongitude != 0:
+                late_lons.append(traj.dLongitude)
+                late_lats.append(traj.dLatitude)
+                late_alts.append(traj.fAltitude)
+        
+        if late_lons:
+            self.ax.plot(late_lons, late_lats, late_alts,
+                        'r-', linewidth=2, alpha=0.7, label='Late Scenario')
+            all_lons.extend(late_lons)
+            all_lats.extend(late_lats)
+            all_depths.extend(late_alts)
+        
+        # Target position
+        if ep_data.Target_Lat != 0 or ep_data.Target_Lon != 0:
+            self.ax.scatter(
+                [ep_data.Target_Lon],
+                [ep_data.Target_Lat],
+                [ep_data.Target_Alt],
+                c='red', s=200, marker='X',
+                label='Target', zorder=50
+            )
+            all_lons.append(ep_data.Target_Lon)
+            all_lats.append(ep_data.Target_Lat)
+            all_depths.append(ep_data.Target_Alt)
+        
+        # Current missile position
+        if ep_data.bValidMslPos:
+            self.ax.scatter(
+                [ep_data.MslPos.dLongitude],
+                [ep_data.MslPos.dLatitude],
+                [ep_data.MslPos.fAltitude],
+                c='orange', s=150, marker='D',
+                label='Current Position', zorder=60
+            )
+            all_lons.append(ep_data.MslPos.dLongitude)
+            all_lats.append(ep_data.MslPos.dLatitude)
+            all_depths.append(ep_data.MslPos.fAltitude)
         
         return all_lons, all_lats, all_depths
-    
-    def _plot_prohibited_areas(self, all_lons, all_lats):
-        """Plot prohibited areas (real-time from main GUI)"""
-        # Get PA info from main GUI in real-time
-        pa_info = None
-        if hasattr(self.main_gui, 'pa_info_data'):
-            pa_info = self.main_gui.pa_info_data
-        
-        if not pa_info or pa_info.nCountPA == 0:
-            return
-        
-        for i in range(pa_info.nCountPA):
-            pa = pa_info.stPaPoint[i]
-            
-            # Draw circle at sea level (z=0)
-            circle_points = 50
-            theta = np.linspace(0, 2*np.pi, circle_points)
-            
-            # Approximate radius in degrees
-            radius_deg = pa.dRadius / 111000  # Convert meters to degrees
-            
-            circle_lons = pa.dLongitude + radius_deg * np.cos(theta)
-            circle_lats = pa.dLatitude + radius_deg * np.sin(theta)
-            circle_z = np.zeros(circle_points)
-            
-            self.ax.plot(circle_lons, circle_lats, circle_z,
-                        'r--', linewidth=2, alpha=0.8, 
-                        label='Prohibited Area' if i == 0 else '')
-            
-            # Add to all points for range calculation
-            all_lons.extend(circle_lons.tolist())
-            all_lats.extend(circle_lats.tolist())
     
     def _set_axis_limits(self, all_lons, all_lats, all_depths):
         """Set axis limits based on data range with margin"""
@@ -797,3 +929,22 @@ class EPPlotWindow(tk.Toplevel):
         """Handle window closing"""
         self.is_running = False
         self.destroy()
+
+
+# =============================================================================
+# Main entry point for testing
+# =============================================================================
+
+if __name__ == "__main__":
+    root = tk.Tk()
+    root.withdraw()  # Hide main window
+    
+    # Mock main GUI for testing
+    class MockMainGUI:
+        def __init__(self):
+            self.pa_info_data = None
+            self.ownship_info_data = None
+    
+    mock_gui = MockMainGUI()
+    viewer = EngagementPlanViewer(root, mock_gui)
+    root.mainloop()
