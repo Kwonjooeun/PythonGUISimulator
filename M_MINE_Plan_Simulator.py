@@ -1,41 +1,13 @@
 # _*_ coding: utf-8 _*_
 #from rti.connextdds import Int8Seq
-from tkinter.constants import FALSE
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.patches import Circle
-import numpy as np
 from Communication.aiep_msg_subscriber import MySubscriber
 from Communication.aiep_msg_publisher import MYPublisher
 import tkinter as tk
-from tkinter import ttk, messagebox
 import threading
 import subprocess
 import time
-import json
-import os
 import sys
-import array
-import ast
-import re
-from DDSDisplayConverter import DdsDisplayConverter
-from dds.AIEP_AIEP_ import (
-    CMSHCI_AIEP_M_MINE_SELECTED_PLAN, 
-    AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST, 
-    CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST, 
-    ST_M_MINE_PLAN_INFO, ST_M_MINE_PLAN_LIST, 
-    ST_WEAPON_WAYPOINT, 
-    CMSHCI_AIEP_WPN_GEO_WAYPOINTS, 
-    NAVINF_SHIP_NAVIGATION_INFO, 
-    TEWA_WA_TUBE_LOAD_INFO, 
-    TRKMGR_SYSTEMTARGET_INFO, 
-    AIEP_WPN_CTRL_STATUS_INFO,
-    AIEP_ALM_ASM_EP_RESULT,
-    AIEP_WGT_EP_RESULT,
-    AIEP_AAM_EP_RESULT,
-    CMSHCI_AIEP_PA_INFO
-)
+from dds.AIEP_AIEP_ import TEWA_WA_TUBE_LOAD_INFO
 from Windows.TEWA_ASSIGN_CMD_Window import TEWAAssignCmdWindow
 from Windows.WpnCtrlCmdWindow import WpnCtrlCmdWindow
 from Windows.PAInfoWindow import PAInfoWindow
