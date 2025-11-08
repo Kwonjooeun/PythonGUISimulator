@@ -4,11 +4,19 @@ import sys
 import xml.etree.ElementTree as ET
 import rti.connextdds as dds
 from typing import cast
-from dds.AIEP_AIEP_ import AIEP_M_MINE_EP_RESULT, AIEP_INTERNAL_INFER_RESULT_FIRE_TIME, AIEP_WPN_CTRL_STATUS_INFO, AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST, AIEP_AI_INFER_RESULT_WP, CMSHCI_AIEP_WPN_GEO_WAYPOINTS
+from dds.AIEP_AIEP_ import (
+        AIEP_INTERNAL_INFER_RESULT_FIRE_TIME,
+        AIEP_WPN_CTRL_STATUS_INFO,
+        AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST,
+        AIEP_M_MINE_EP_RESULT,
+        AIEP_AI_INFER_RESULT_WP,
+        AIEP_ALM_ASM_EP_RESULT,
+        AIEP_WGT_EP_RESULT,
+        AIEP_AAM_EP_RESULT,
+        CMSHCI_AIEP_PA_INFO,
+        CMSHCI_AIEP_WPN_GEO_WAYPOINTS
+)
 from aiep_msg_publisher import MYPublisher
-
-import numpy as np
-import matplotlib.pyplot as plt
 
 class MySubscriber:
     participant = None
@@ -68,7 +76,12 @@ class MySubscriber:
             AIEP_WPN_CTRL_STATUS_INFO,
             AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST,
             AIEP_M_MINE_EP_RESULT,
-            AIEP_AI_INFER_RESULT_WP
+            AIEP_AI_INFER_RESULT_WP,
+            AIEP_ALM_ASM_EP_RESULT,
+            AIEP_WGT_EP_RESULT,
+            AIEP_AAM_EP_RESULT,
+            CMSHCI_AIEP_PA_INFO,
+            CMSHCI_AIEP_WPN_GEO_WAYPOINTS
         ]
         
         for message_class in message_classes:
@@ -107,6 +120,21 @@ class MySubscriber:
             # 자항기뢰 교전계획 산출 결과
             if isinstance(sample, AIEP_M_MINE_EP_RESULT):
                 MySubscriber.data_AIEP_M_MINE_EP_RESULT = cast(AIEP_M_MINE_EP_RESULT, sample)
+
+            # ALM/ASM EP Result
+            if isinstance(sample, AIEP_ALM_ASM_EP_RESULT):
+                MySubscriber.data_AIEP_ALM_ASM_EP_RESULT = cast(AIEP_ALM_ASM_EP_RESULT, sample)
+                print(f'[Rcvd] AIEP_ALM_ASM_EP_RESULT from Tube {sample.enTubeNum}')
+        
+            # WGT EP Result
+            if isinstance(sample, AIEP_WGT_EP_RESULT):
+                MySubscriber.data_AIEP_WGT_EP_RESULT = cast(AIEP_WGT_EP_RESULT, sample)
+                print(f'[Rcvd] AIEP_WGT_EP_RESULT from Tube {sample.enTubeNum}')
+        
+            # AAM EP Result
+            if isinstance(sample, AIEP_AAM_EP_RESULT):
+                MySubscriber.data_AIEP_AAM_EP_RESULT = cast(AIEP_AAM_EP_RESULT, sample)
+                print(f'[Rcvd] AIEP_AAM_EP_RESULT from Tube {sample.eTubeNum}')
 
             if isinstance(sample, AIEP_INTERNAL_INFER_RESULT_FIRE_TIME):
                 MySubscriber.data_AIEP_INTERNAL_INFER_RESULT_FIRE_TIME = cast(AIEP_INTERNAL_INFER_RESULT_FIRE_TIME, sample)
