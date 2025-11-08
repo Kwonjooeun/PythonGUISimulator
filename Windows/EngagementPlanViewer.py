@@ -10,20 +10,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from mpl_toolkits.mplot3d import Axes3D
-from matplotlib.patches import Circle
-import matplotlib.patches as mpatches
 import numpy as np
-import threading
-import time
 from Communication.aiep_msg_subscriber import MySubscriber
-from dds.AIEP_AIEP_ import (
-    AIEP_M_MINE_EP_RESULT,
-    AIEP_ALM_ASM_EP_RESULT,
-    AIEP_WGT_EP_RESULT,
-    AIEP_AAM_EP_RESULT,
-    NAVINF_SHIP_NAVIGATION_INFO
-)
 
 
 # =============================================================================
@@ -693,13 +681,11 @@ class EPPlotWindow(tk.Toplevel):
         traj_lats = []
         traj_lons = []
         traj_depths = []
-        
+        	
         for i in range(128):  # Assuming max 128 trajectory points
-            if i >= len(ep_data.Traj_Lat) or i >= len(ep_data.Traj_Lon):
-                break
-            lat = ep_data.Traj_Lat[i]
-            lon = ep_data.Traj_Lon[i]
-            depth = ep_data.Traj_Depth[i]
+            lat = ep_data.stTrajectories_WGT[i].dLatitude
+            lon = ep_data.stTrajectories_WGT[i].dLongitude
+            depth = ep_data.stTrajectories_WGT[i].fDepth
             
             if lat != 0 or lon != 0:
                 traj_lats.append(lat)
@@ -716,30 +702,30 @@ class EPPlotWindow(tk.Toplevel):
         # Hit point (target)
         if ep_data.bHitPointFound:
             self.ax.scatter(
-                [ep_data.dHit_Lon],
-                [ep_data.dHit_Lat],
-                [-ep_data.dHit_Depth],
+                [ep_data.dHit_Longitude],
+                [ep_data.dHit_Latitude],
+                [0],
                 c='red', s=200, marker='X',
                 label='Target Hit Point', zorder=50
             )
-            all_lons.append(ep_data.dHit_Lon)
-            all_lats.append(ep_data.dHit_Lat)
-            all_depths.append(-ep_data.dHit_Depth)
+            all_lons.append(ep_data.dHit_Longitude)
+            all_lats.append(ep_data.dHit_Latitude)
+            all_depths.append(0)
         
         # Current torpedo position
         if ep_data.bValidTorpedoCurrentPosition:
             self.ax.scatter(
-                [ep_data.dTorpedoCurrent_Lon],
-                [ep_data.dTorpedoCurrent_Lat],
-                [-ep_data.dTorpedoCurrent_Depth],
+                [ep_data.stTorpedoCurrentPosition.dLatitude],
+                [ep_data.stTorpedoCurrentPosition.dLongitude],
+                [-ep_data.stTorpedoCurrentPosition.fDepth],
                 c='orange', s=150, marker='D',
                 label='Current Position', zorder=60
             )
-            all_lons.append(ep_data.dTorpedoCurrent_Lon)
-            all_lats.append(ep_data.dTorpedoCurrent_Lat)
-            all_depths.append(-ep_data.dTorpedoCurrent_Depth)
+            all_lons.append(ep_data.stTorpedoCurrentPosition.dLatitude)
+            all_lats.append(ep_data.stTorpedoCurrentPosition.dLongitude)
+            all_depths.append(-ep_data.stTorpedoCurrentPosition.fDepth)
         
-        return all_lons, all_lats, all_depths
+        return all_lons, all_lats, all_depths    
     
     def _plot_aam(self, ep_data):
         """Plot AAM engagement plan (3 scenarios)"""
@@ -802,17 +788,22 @@ class EPPlotWindow(tk.Toplevel):
             all_depths.extend(late_alts)
         
         # Target position
-        if ep_data.Target_Lat != 0 or ep_data.Target_Lon != 0:
-            self.ax.scatter(
-                [ep_data.Target_Lon],
-                [ep_data.Target_Lat],
-                [ep_data.Target_Alt],
-                c='red', s=200, marker='X',
-                label='Target', zorder=50
-            )
-            all_lons.append(ep_data.Target_Lon)
-            all_lats.append(ep_data.Target_Lat)
-            all_depths.append(ep_data.Target_Alt)
+        target_lons = []
+        target_lats = []
+        target_alts = []
+        for i in range(128):
+            traj = ep_data.Target_Traj[i]
+            if traj.dblLatitude != 0 or traj.dblLongitude != 0:
+                target_lons.append(traj.dblLongitude)
+                target_lats.append(traj.dblLatitude)
+                target_alts.append(traj.fAltitude)
+
+        if target_lons:
+            self.ax.scatter(target_lons,target_lats,target_alts,
+                c='r-', linewidth=2, alpha=0.7, label= 'Target', zorder=50)
+            all_lons.append(target_lons)
+            all_lats.append(target_lats)
+            all_depths.append(target_alts)
         
         # Current missile position
         if ep_data.bValidMslPos:
