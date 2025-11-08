@@ -33,29 +33,29 @@ WEAPON_TYPES = {
 
 def get_tube_ep_data(tube_num):
     """Get engagement plan data for specific tube"""
-    # M_MINE
+    # M_MINE - 딕셔너리에서 조회
     if hasattr(MySubscriber, 'data_AIEP_M_MINE_EP_RESULT'):
-        data = MySubscriber.data_AIEP_M_MINE_EP_RESULT
-        if data and data.enTubeNum == tube_num:
-            return ('M_MINE', data)
+        data_dict = MySubscriber.data_AIEP_M_MINE_EP_RESULT
+        if isinstance(data_dict, dict) and tube_num in data_dict:
+            return ('M_MINE', data_dict[tube_num])
     
-    # ALM/ASM
+    # ALM/ASM - 딕셔너리에서 조회
     if hasattr(MySubscriber, 'data_AIEP_ALM_ASM_EP_RESULT'):
-        data = MySubscriber.data_AIEP_ALM_ASM_EP_RESULT
-        if data and data.enTubeNum == tube_num:
-            return ('ALM_ASM', data)
+        data_dict = MySubscriber.data_AIEP_ALM_ASM_EP_RESULT
+        if isinstance(data_dict, dict) and tube_num in data_dict:
+            return ('ALM_ASM', data_dict[tube_num])
     
-    # WGT
+    # WGT - 딕셔너리에서 조회
     if hasattr(MySubscriber, 'data_AIEP_WGT_EP_RESULT'):
-        data = MySubscriber.data_AIEP_WGT_EP_RESULT
-        if data and data.enTubeNum == tube_num:
-            return ('WGT', data)
+        data_dict = MySubscriber.data_AIEP_WGT_EP_RESULT
+        if isinstance(data_dict, dict) and tube_num in data_dict:
+            return ('WGT', data_dict[tube_num])
     
-    # AAM
+    # AAM - 딕셔너리에서 조회
     if hasattr(MySubscriber, 'data_AIEP_AAM_EP_RESULT'):
-        data = MySubscriber.data_AIEP_AAM_EP_RESULT
-        if data and data.eTubeNum == tube_num:
-            return ('AAM', data)
+        data_dict = MySubscriber.data_AIEP_AAM_EP_RESULT
+        if isinstance(data_dict, dict) and tube_num in data_dict:
+            return ('AAM', data_dict[tube_num])
     
     return (None, None)
 
