@@ -220,11 +220,11 @@ class EngagementPlanViewer(tk.Toplevel):
     def _start_status_update(self):
         """Start periodic tube status update"""
         self._update_tube_status()
-    
     def _update_tube_status(self):
         """Update tube button status"""
         for tube_num in self.tube_buttons.keys():
-            wpn_type, ep_data = get_tube_ep_data(tube_num)
+            # main_gui 참조 전달
+            wpn_type, ep_data = get_tube_ep_data(tube_num, self.main_gui)
             
             if wpn_type:
                 self.tube_status_labels[tube_num].config(
@@ -244,7 +244,8 @@ class EngagementPlanViewer(tk.Toplevel):
     
     def _open_plot_window(self, tube_num):
         """Open plot window for selected tube"""
-        wpn_type, ep_data = get_tube_ep_data(tube_num)
+        # main_gui 참조 전달
+        wpn_type, ep_data = get_tube_ep_data(tube_num, self.main_gui)
         
         if not wpn_type:
             messagebox.showinfo(
@@ -353,7 +354,8 @@ class EPPlotWindow(tk.Toplevel):
         # Initial view angle
         self.view_azim = -60
         self.view_elev = 30
-        def _start_plot_update(self):
+        
+    def _start_plot_update(self):
         """Start periodic plot update"""
         self._update_plot()
     
