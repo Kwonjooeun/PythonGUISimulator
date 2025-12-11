@@ -16,7 +16,7 @@ from dds.AIEP_AIEP_ import (
         CMSHCI_AIEP_PA_INFO,
         CMSHCI_AIEP_WPN_GEO_WAYPOINTS
 )
-from aiep_msg_publisher import MYPublisher
+from Communication.aiep_msg_publisher import MYPublisher
 
 class MySubscriber:
     participant = None
