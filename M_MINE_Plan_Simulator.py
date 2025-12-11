@@ -110,7 +110,7 @@ class M_MINE_PlanGUI:
 
     def show_engagement_plan(self):
         """Show engagement plan viewer with PA info"""
-        EngagementPlanViewer(self.root, self.pa_info_data)
+        EngagementPlanViewer(self.root, self)
 
     # --- DDS Request/Response ---
     def request_plan_list(self):
