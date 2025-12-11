@@ -4,10 +4,9 @@ from Communication.aiep_msg_subscriber import MySubscriber
 from Communication.aiep_msg_publisher import MYPublisher
 import tkinter as tk
 import threading
-import subprocess
-import time
 import sys
-from dds.AIEP_AIEP_ import TEWA_WA_TUBE_LOAD_INFO
+import time
+from dds.AIEP_AIEP_ import TRKMGR_SYSTEMTARGET_INFO, TEWA_WA_TUBE_LOAD_INFO
 from Windows.TEWA_ASSIGN_CMD_Window import TEWAAssignCmdWindow
 from Windows.WpnCtrlCmdWindow import WpnCtrlCmdWindow
 from Windows.PAInfoWindow import PAInfoWindow
@@ -20,17 +19,17 @@ from Windows.TubeLoadInfoWindow import TubeLoadInfoWindow
 
 # --- Main GUI Class ---
 class M_MINE_PlanGUI:
-    def __init__(self, root):
+    def __init__(self, root, domain_id):
         self.root = root
         self.root.title("Dropping Plan Application")
 
         # DDS publishers/subscribers
         self.req_publisher = MYPublisher()
-        self.req_publisher.initialize_participant(83)
+        self.req_publisher.initialize_participant(domain_id)
 
         # 애플리케이션 시작 시 subscriber 스레드 시작
-        threading.Thread(target=self.run_subscriber_thread, args=(83,), daemon=True).start()
-
+        threading.Thread(target=self.run_subscriber_thread, args=(domain_id,), daemon=True).start()
+        
         # 시뮬레이터에서 설정한 정보 저장
         self.pa_info_data = None           # 금지구역 정보
         self.ownship_info_data = None      # 자함 정보
@@ -136,8 +135,15 @@ class M_MINE_PlanGUI:
 
     
 def main():
+    if len(sys.argv) > 1:
+        arg_domain_id = int(sys.argv[1])
+        print("첫 번째 인자(도메인번호):", arg_domain_id)
+    else:
+        print("인자가 없습니다.")
+        arg_domain_id = 83
+
     root = tk.Tk()
-    app = M_MINE_PlanGUI(root)    
+    app = M_MINE_PlanGUI(root, arg_domain_id)    
     root.mainloop()
 
 if __name__ == "__main__":
