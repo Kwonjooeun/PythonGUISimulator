@@ -78,6 +78,7 @@ class MYPublisher:
             TEWA_WA_TUBE_LOAD_INFO,
             TRKMGR_SYSTEMTARGET_INFO,
             NAVINF_SHIP_NAVIGATION_INFO,
+            TEWA_WA_TUBE_LOAD_INFO, 
             AIEP_INTERNAL_INFER_REQ,
             AIEP_WPN_CTRL_STATUS_INFO
         ]
@@ -105,3 +106,15 @@ class MYPublisher:
     @staticmethod
     def publish_TEWA_ASSIGN_CMD(data):
         MYPublisher.writerTEWA_ASSIGN_CMD.write(data)
+
+    @staticmethod
+    def publish_NAVINF_SHIP_NAVIGATION_INFO(data):
+        """Publish ownship navigation info"""
+        MYPublisher.writerNAVINF_SHIP_NAVIGATION_INFO.write(data)
+        print("NAVINF_SHIP_NAVIGATION_INFO sent")
+
+    @staticmethod
+    def publish_TEWA_WA_TUBE_LOAD_INFO(data):
+        """Publish tube load info"""
+        MYPublisher.writerTEWA_WA_TUBE_LOAD_INFO.write(data)
+        print(f"TEWA_WA_TUBE_LOAD_INFO sent for Tube {data.eTubeNum}")
