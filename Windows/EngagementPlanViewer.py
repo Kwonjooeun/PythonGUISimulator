@@ -36,31 +36,46 @@ WEAPON_TYPES = {
 # Helper Functions
 # =============================================================================
 
-def get_tube_ep_data(tube_num):
-    """Get engagement plan data for specific tube"""
-    # M_MINE - 딕셔너리에서 조회
-    if hasattr(MySubscriber, 'data_AIEP_M_MINE_EP_RESULT'):
-        data_dict = MySubscriber.data_AIEP_M_MINE_EP_RESULT
-        if isinstance(data_dict, dict) and tube_num in data_dict:
-            return ('M_MINE', data_dict[tube_num])
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+def get_tube_ep_data(tube_num, main_gui=None):
+    """Get engagement plan data for specific tube (considering assigned weapon)"""
     
-    # ALM/ASM - 딕셔너리에서 조회
-    if hasattr(MySubscriber, 'data_AIEP_ALM_ASM_EP_RESULT'):
-        data_dict = MySubscriber.data_AIEP_ALM_ASM_EP_RESULT
-        if isinstance(data_dict, dict) and tube_num in data_dict:
-            return ('ALM_ASM', data_dict[tube_num])
+    # 현재 할당된 무장 종류 확인
+    assigned_weapon_kind = None
+    if main_gui and hasattr(main_gui, 'tube_load_info_data'):
+        assigned_weapon_kind = main_gui.tube_load_info_data.get(tube_num)
     
-    # WGT - 딕셔너리에서 조회
-    if hasattr(MySubscriber, 'data_AIEP_WGT_EP_RESULT'):
-        data_dict = MySubscriber.data_AIEP_WGT_EP_RESULT
-        if isinstance(data_dict, dict) and tube_num in data_dict:
-            return ('WGT', data_dict[tube_num])
+    # 무장이 할당되지 않은 경우
+    if assigned_weapon_kind is None or assigned_weapon_kind == 0:
+        return (None, None)
     
-    # AAM - 딕셔너리에서 조회
-    if hasattr(MySubscriber, 'data_AIEP_AAM_EP_RESULT'):
-        data_dict = MySubscriber.data_AIEP_AAM_EP_RESULT
-        if isinstance(data_dict, dict) and tube_num in data_dict:
-            return ('AAM', data_dict[tube_num])
+    # 할당된 무장 종류에 따라 해당 데이터만 반환
+    if assigned_weapon_kind == 2:  # M_MINE
+        if hasattr(MySubscriber, 'data_AIEP_M_MINE_EP_RESULT'):
+            data_dict = MySubscriber.data_AIEP_M_MINE_EP_RESULT
+            if isinstance(data_dict, dict) and tube_num in data_dict:
+                return ('M_MINE', data_dict[tube_num])
+    
+    elif assigned_weapon_kind in [3, 4]:  # ASM or ALM
+        if hasattr(MySubscriber, 'data_AIEP_ALM_ASM_EP_RESULT'):
+            data_dict = MySubscriber.data_AIEP_ALM_ASM_EP_RESULT
+            if isinstance(data_dict, dict) and tube_num in data_dict:
+                return ('ALM_ASM', data_dict[tube_num])
+    
+    elif assigned_weapon_kind == 1:  # WGT
+        if hasattr(MySubscriber, 'data_AIEP_WGT_EP_RESULT'):
+            data_dict = MySubscriber.data_AIEP_WGT_EP_RESULT
+            if isinstance(data_dict, dict) and tube_num in data_dict:
+                return ('WGT', data_dict[tube_num])
+    
+    elif assigned_weapon_kind == 5:  # AAM
+        if hasattr(MySubscriber, 'data_AIEP_AAM_EP_RESULT'):
+            data_dict = MySubscriber.data_AIEP_AAM_EP_RESULT
+            if isinstance(data_dict, dict) and tube_num in data_dict:
+                return ('AAM', data_dict[tube_num])
     
     return (None, None)
 
@@ -77,9 +92,15 @@ def get_ownship_info():
 # =============================================================================
 
 class EngagementPlanViewer(tk.Toplevel):
-    """Tube selection window with layout: [6 4 3 5] [2 1]"""
+    """Engagement Plan 3D Visualization Window"""
     
-    def __init__(self, parent, main_gui):
+    def __init__(self, parent, tube_num, main_gui):
+        super().__init__(parent)
+        self.tube_num = tube_num
+        self.main_gui = main_gui  # main_gui 참조 저장
+        self.is_running = True
+        
+        # ... (나머지 초기화 코드)
         super().__init__(parent)
         self.title("Engagement Plan Viewer - Select Tube")
         self.geometry("600x400")
@@ -309,20 +330,28 @@ class EPPlotWindow(tk.Toplevel):
     def _start_plot_update(self):
         """Start periodic plot update"""
         self._update_plot()
-    
-    def _update_plot(self):
+        
+        def _update_plot(self):
         """Update plot with latest data"""
         if not self.is_running or not self.winfo_exists():
             return
         
-        wpn_type, ep_data = get_tube_ep_data(self.tube_num)
+        # main_gui 참조를 전달하여 현재 할당된 무장 확인
+        wpn_type, ep_data = get_tube_ep_data(self.tube_num, self.main_gui)
         
         if wpn_type and ep_data:
             self._plot_engagement_plan(wpn_type, ep_data)
             self._update_info_panel(wpn_type, ep_data)
         else:
             self.ax.clear()
-            self.ax.text(0.5, 0.5, 0.5, "No Data", 
+            # 무장이 할당되지 않은 경우 메시지 표시
+            assigned_weapon = self.main_gui.tube_load_info_data.get(self.tube_num, 0) if self.main_gui else 0
+            if assigned_weapon == 0:
+                msg = "No Weapon Assigned"
+            else:
+                msg = "Waiting for Data..."
+            
+            self.ax.text(0.5, 0.5, 0.5, msg, 
                         ha='center', va='center', fontsize=20, color='red')
         
         self.canvas.draw()
