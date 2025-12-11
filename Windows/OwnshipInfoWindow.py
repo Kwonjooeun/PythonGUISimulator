@@ -126,6 +126,7 @@ class OwnshipInfoWindow(tk.Toplevel):
             msg.stShipMovementInfo.dShipLatitude = lat
             msg.stShipMovementInfo.dShipLongitude = lon
             msg.stShipMovementInfo.fShipDepth = depth
+            msg.stUnderwaterEnvironmentInfo.fDivingDepth = depth
             msg.stShipMovementInfo.fShipSpeed = speed
             msg.stShipMovementInfo.fShipHeading = heading
             
