@@ -118,7 +118,7 @@ class TEWAAssignCmdWindow(tk.Toplevel):
             session.usAllocLayNum = usAllocLayNum
             session.enAllocTube = enAllocTube
             session.enAllocLay = enAllocLay
-                      session.enAllocTrack = enAllocTrack
+            session.enAllocTrack = enAllocTrack
             session.stTargetPos.dLatitude = dLatitude
             session.stTargetPos.dLongitude = dLongitude
             session.stTargetPos.fAltitude = fAltitude
@@ -150,7 +150,7 @@ class TEWAAssignCmdWindow(tk.Toplevel):
     
     def load_from_json(self):
         try:
-                     data = load_values_from_json()
+            data = load_values_from_json()
             if data is None:
                 return
             self.eSetCmd_entry.delete(0, tk.END)
