@@ -10,7 +10,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from mpl_toolkits.mplot3d import Axes3D
+from matplotlib.patches import Circle
+import matplotlib.patches as mpatches
 import numpy as np
+import threading
+import time
 from Communication.aiep_msg_subscriber import MySubscriber
 
 
@@ -332,6 +337,11 @@ class EPPlotWindow(tk.Toplevel):
     
     def _plot_engagement_plan(self, wpn_type, ep_data):
         """Plot engagement plan based on weapon type"""
+        # 사용자가 회전시킨 현재 view angle 저장
+        if hasattr(self.ax, 'elev') and hasattr(self.ax, 'azim'):
+            self.view_elev = self.ax.elev
+            self.view_azim = self.ax.azim
+            
         self.ax.clear()
         
         # Collect all points for range calculation
@@ -373,7 +383,8 @@ class EPPlotWindow(tk.Toplevel):
         self.ax.set_zlabel('Depth/Altitude (m)', fontsize=10)
         self.ax.set_title(f'{wpn_type} Engagement Plan - Tube {self.tube_num}', fontsize=12, fontweight='bold')
         self.ax.view_init(elev=self.view_elev, azim=self.view_azim)
-        
+
+        self.ax.view_init(elev=self.view_elev, azim=self.view_azim)
         # Set axis limits based on data range
         self._set_axis_limits(all_lons, all_lats, all_depths)
         
@@ -470,7 +481,7 @@ class EPPlotWindow(tk.Toplevel):
             theta = np.linspace(0, 2*np.pi, num_circle_points)
             
             # Depth levels for cylinder (from -100m to 0m, underwater so negative)
-            depth_levels = np.linspace(-100, 0, 20)  # 20 levels from 100m depth to surface
+            depth_levels = np.linspace(-60, 0, 20)  # 20 levels from 100m depth to surface
             
             # Draw vertical lines (edges of cylinder)
             for angle in np.linspace(0, 2*np.pi, 12):  # 12 vertical lines
@@ -479,7 +490,7 @@ class EPPlotWindow(tk.Toplevel):
                 self.ax.plot(
                     [edge_lon, edge_lon], 
                     [edge_lat, edge_lat], 
-                    [-100, 0],
+                    [-60, 0],
                     'r-', linewidth=1, alpha=0.6
                 )
             
@@ -507,7 +518,7 @@ class EPPlotWindow(tk.Toplevel):
             
             # Optional: Fill the cylinder with semi-transparent surface
             # Create mesh for cylinder surface
-            z_mesh = np.linspace(-100, 0, 10)
+            z_mesh = np.linspace(-60, 0, 10)
             theta_mesh = np.linspace(0, 2*np.pi, num_circle_points)
             Theta_mesh, Z_mesh = np.meshgrid(theta_mesh, z_mesh)
             
@@ -715,14 +726,14 @@ class EPPlotWindow(tk.Toplevel):
         # Current torpedo position
         if ep_data.bValidTorpedoCurrentPosition:
             self.ax.scatter(
-                [ep_data.stTorpedoCurrentPosition.dLatitude],
                 [ep_data.stTorpedoCurrentPosition.dLongitude],
+                [ep_data.stTorpedoCurrentPosition.dLatitude],
                 [-ep_data.stTorpedoCurrentPosition.fDepth],
                 c='orange', s=150, marker='D',
                 label='Current Position', zorder=60
             )
-            all_lons.append(ep_data.stTorpedoCurrentPosition.dLatitude)
-            all_lats.append(ep_data.stTorpedoCurrentPosition.dLongitude)
+            all_lons.append(ep_data.stTorpedoCurrentPosition.dLongitude)
+            all_lats.append(ep_data.stTorpedoCurrentPosition.dLatitude)
             all_depths.append(-ep_data.stTorpedoCurrentPosition.fDepth)
         
         return all_lons, all_lats, all_depths    
@@ -739,9 +750,9 @@ class EPPlotWindow(tk.Toplevel):
         early_alts = []
         for i in range(128):
             traj = ep_data.Early_Traj[i]
-            if traj.dLatitude != 0 or traj.dLongitude != 0:
-                early_lons.append(traj.dLongitude)
-                early_lats.append(traj.dLatitude)
+            if traj.dblLatitude != 0 or traj.dblLongitude != 0:
+                early_lons.append(traj.dblLongitude)
+                early_lats.append(traj.dblLatitude)
                 early_alts.append(traj.fAltitude)
         
         if early_lons:
@@ -757,9 +768,9 @@ class EPPlotWindow(tk.Toplevel):
         short_alts = []
         for i in range(128):
             traj = ep_data.Short_Traj[i]
-            if traj.dLatitude != 0 or traj.dLongitude != 0:
-                short_lons.append(traj.dLongitude)
-                short_lats.append(traj.dLatitude)
+            if traj.dblLatitude != 0 or traj.dblLongitude != 0:
+                short_lons.append(traj.dblLongitude)
+                short_lats.append(traj.dblLatitude)
                 short_alts.append(traj.fAltitude)
         
         if short_lons:
@@ -775,14 +786,14 @@ class EPPlotWindow(tk.Toplevel):
         late_alts = []
         for i in range(128):
             traj = ep_data.Late_Traj[i]
-            if traj.dLatitude != 0 or traj.dLongitude != 0:
-                late_lons.append(traj.dLongitude)
-                late_lats.append(traj.dLatitude)
+            if traj.dblLatitude != 0 or traj.dblLongitude != 0:
+                late_lons.append(traj.dblLongitude)
+                late_lats.append(traj.dblLatitude)
                 late_alts.append(traj.fAltitude)
         
         if late_lons:
             self.ax.plot(late_lons, late_lats, late_alts,
-                        'r-', linewidth=2, alpha=0.7, label='Late Scenario')
+                        'b-', linewidth=2, alpha=0.7, label='Late Scenario')
             all_lons.extend(late_lons)
             all_lats.extend(late_lats)
             all_depths.extend(late_alts)
