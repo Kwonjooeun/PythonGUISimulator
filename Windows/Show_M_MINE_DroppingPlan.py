@@ -4,11 +4,7 @@ from tkinter import ttk, messagebox
 import copy
 from dds.AIEP_AIEP_ import (
     AIEP_CMSHCI_M_MINE_ALL_PLAN_LIST,
-    CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST,
-    ST_M_MINE_PLAN_LIST,
-    ST_M_MINE_PLAN_INFO,
-    ST_WEAPON_WAYPOINT,
-    ST_M_MINE_PLAN_OWNSHIP_WAYPOINT
+    CMSHCI_AIEP_M_MINE_EDITED_PLAN_LIST
 )
 
 
